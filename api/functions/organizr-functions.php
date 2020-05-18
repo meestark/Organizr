@@ -44,6 +44,9 @@ function organizrSpecialSettings()
 			'options' => array(
 				'alternateHomepageHeaders' => $GLOBALS['alternateHomepageHeaders'],
 				'healthChecksTags' => $GLOBALS['healthChecksTags'],
+				'titles' => array(
+					'tautulli' => $GLOBALS['tautulliHeader']
+				)
 			),
 			'media' => array(
 				'jellyfin' => (strpos($GLOBALS['embyURL'], 'jellyfin') !== false) ? true : false
@@ -107,6 +110,9 @@ function organizrSpecialSettings()
 		'login' => array(
 			'rememberMe' => $GLOBALS['rememberMe'],
 			'rememberMeDays' => $GLOBALS['rememberMeDays'],
+			'wanDomain' => $GLOBALS['wanDomain'],
+			'localAddress' => $GLOBALS['localAddress'],
+			'enableLocalAddressForward' => $GLOBALS['enableLocalAddressForward'],
 		),
 		'misc' => array(
 			'installedPlugins' => qualifyRequest(1) ? $GLOBALS['installedPlugins'] : '',
@@ -820,7 +826,30 @@ function getSettingsMain()
 						'value' => 'allow-top-navigation'
 					),
 				)
-			)
+			),
+			array(
+				'type' => 'switch',
+				'name' => 'traefikAuthEnable',
+				'label' => 'Enable Traefik Auth Redirect',
+				'help' => 'This will enable the webserver to forward errors so traefik will accept them',
+				'value' => $GLOBALS['traefikAuthEnable']
+			),
+		),
+		'Performance' => array(
+			array(
+				'type' => 'switch',
+				'name' => 'performanceDisableIconDropdown',
+				'label' => 'Disable Icon Dropdown',
+				'help' => 'Disable select dropdown boxes on new and edit tab forms',
+				'value' => $GLOBALS['performanceDisableIconDropdown'],
+			),
+			array(
+				'type' => 'switch',
+				'name' => 'performanceDisableImageDropdown',
+				'label' => 'Disable Image Dropdown',
+				'help' => 'Disable select dropdown boxes on new and edit tab forms',
+				'value' => $GLOBALS['performanceDisableImageDropdown'],
+			),
 		),
 		'Login' => array(
 			array(
@@ -868,6 +897,29 @@ function getSettingsMain()
 				'value' => $GLOBALS['localIPTo'],
 				'placeholder' => 'i.e. 123.123.123.123',
 				'help' => 'IPv4 only at the moment - This will set your login as local if your IP falls within the From and To'
+			),
+			array(
+				'type' => 'input',
+				'name' => 'wanDomain',
+				'label' => 'WAN Domain',
+				'value' => $GLOBALS['wanDomain'],
+				'placeholder' => 'only domain and tld - i.e. domain.com',
+				'help' => 'Enter domain if you wish to be forwarded to a local address - Local Address filled out on next item'
+			),
+			array(
+				'type' => 'input',
+				'name' => 'localAddress',
+				'label' => 'Local Address',
+				'value' => $GLOBALS['localAddress'],
+				'placeholder' => 'http://home.local',
+				'help' => 'Full local address of organizr install - i.e. http://home.local or http://192.168.0.100'
+			),
+			array(
+				'type' => 'switch',
+				'name' => 'enableLocalAddressForward',
+				'label' => 'Enable Local Address Forward',
+				'help' => 'Enables the local address forward if on local address and accessed from WAN Domain',
+				'value' => $GLOBALS['enableLocalAddressForward'],
 			),
 		),
 		'Auth Proxy' => array(
@@ -1091,6 +1143,7 @@ function loadAppearance()
 	$appearance['logo'] = $GLOBALS['logo'];
 	$appearance['title'] = $GLOBALS['title'];
 	$appearance['useLogo'] = $GLOBALS['useLogo'];
+	$appearance['useLogoLogin'] = $GLOBALS['useLogoLogin'];
 	$appearance['headerColor'] = $GLOBALS['headerColor'];
 	$appearance['headerTextColor'] = $GLOBALS['headerTextColor'];
 	$appearance['sidebarColor'] = $GLOBALS['sidebarColor'];
@@ -1159,6 +1212,12 @@ function getCustomizeAppearance()
 				),
 				array(
 					'type' => 'switch',
+					'name' => 'useLogoLogin',
+					'label' => 'Use Logo instead of Title on Login Page',
+					'value' => $GLOBALS['useLogoLogin']
+				),
+				array(
+					'type' => 'switch',
 					'name' => 'minimalLoginScreen',
 					'label' => 'Minimal Login Screen',
 					'value' => $GLOBALS['minimalLoginScreen']
@@ -1216,6 +1275,7 @@ function getCustomizeAppearance()
 					            <div class="panel-wrapper collapse in" aria-expanded="true">
 					                <div class="panel-body">
 					                    <span lang="en">The value of #987654 is just a placeholder, you can change to any value you like.</span>
+					                    <span lang="en">To revert back to default, save with no value defined in the relevant field.</span>
 					                </div>
 					            </div>
 					        </div>
@@ -1516,6 +1576,7 @@ function updateConfigMultipleForm($array)
 {
 	$newItem = array();
 	foreach ($array['data']['payload'] as $k => $v) {
+		$v['value'] = $v['value'] ?? '';
 		switch ($v['value']) {
 			case 'true':
 				$v['value'] = (bool)true;
@@ -1542,6 +1603,7 @@ function updateConfigMultipleForm($array)
 
 function updateConfigItem($array)
 {
+	$array['data']['value'] = $array['data']['value'] ?? '';
 	switch ($array['data']['value']) {
 		case 'true':
 			$array['data']['value'] = (bool)true;
@@ -1586,14 +1648,14 @@ function editPlugins($array)
 			$newItem = array(
 				$array['data']['configName'] => true
 			);
-			writeLog('success', 'Plugin Function -  Enabled Plugin [' . $_POST['data']['name'] . ']', $GLOBALS['organizrUser']['username']);
+			writeLog('success', 'Plugin Function -  Enabled Plugin [' . $array['data']['name'] . ']', $GLOBALS['organizrUser']['username']);
 			return (updateConfig($newItem)) ? true : false;
 			break;
 		case 'disable':
 			$newItem = array(
 				$array['data']['configName'] => false
 			);
-			writeLog('success', 'Plugin Function -  Disabled Plugin [' . $_POST['data']['name'] . ']', $GLOBALS['organizrUser']['username']);
+			writeLog('success', 'Plugin Function -  Disabled Plugin [' . $array['data']['name'] . ']', $GLOBALS['organizrUser']['username']);
 			return (updateConfig($newItem)) ? true : false;
 			break;
 		default:
@@ -1608,15 +1670,16 @@ function auth()
 	$ban = isset($_GET['ban']) ? strtoupper($_GET['ban']) : "";
 	$whitelist = isset($_GET['whitelist']) ? $_GET['whitelist'] : false;
 	$blacklist = isset($_GET['blacklist']) ? $_GET['blacklist'] : false;
-    $group = 0;
-    $groupParam = $_GET['group'];
-    if(isset($groupParam)) {
-        if (is_numeric($groupParam)) {
-            $group = (int)$groupParam;
-        } else {
-            $group = getTabGroup($groupParam);
-        }
-    }
+	$group = 0;
+	$groupParam = $_GET['group'];
+	$redirect = false;
+	if (isset($groupParam)) {
+		if (is_numeric($groupParam)) {
+			$group = (int)$groupParam;
+		} else {
+			$group = getTabGroup($groupParam);
+		}
+	}
 	$currentIP = userIP();
 	$unlocked = ($GLOBALS['organizrUser']['locked'] == '1') ? false : true;
 	if (isset($GLOBALS['organizrUser'])) {
@@ -1640,35 +1703,38 @@ function auth()
 		}
 	}
 	if ($group !== null) {
+		if ((isset($_SERVER['HTTP_X_FORWARDED_SERVER']) && $_SERVER['HTTP_X_FORWARDED_SERVER'] == 'traefik') || $GLOBALS['traefikAuthEnable']) {
+			$redirect = 'Location: ' . getServerPath();
+		}
 		if (qualifyRequest($group) && $unlocked) {
 			header("X-Organizr-User: $currentUser");
 			header("X-Organizr-Email: $currentEmail");
 			!$debug ? exit(http_response_code(200)) : die("$userInfo Authorized");
 		} else {
-			!$debug ? exit(http_response_code(401)) : die("$userInfo Not Authorized");
+			!$debug ? (!$redirect ? exit(http_response_code(401)) : exit(http_response_code(401) . header($redirect))) : die("$userInfo Not Authorized");
 		}
 	} else {
-		!$debug ? exit(http_response_code(401)) : die("Not Authorized Due To No Parameters Set");
+		!$debug ? (!$redirect ? exit(http_response_code(401)) : exit(http_response_code(401) . header($redirect))) : die("Not Authorized Due To No Parameters Set");
 	}
 }
 
-function getTabGroup ($tab)
+function getTabGroup($tab)
 {
-    try {
-        $connect = new Dibi\Connection([
-            'driver' => 'sqlite3',
-            'database' => $GLOBALS['dbLocation'] . $GLOBALS['dbName'],]);
-        $row = $connect->fetch('SELECT group_id FROM tabs WHERE name LIKE %~like~', $tab);
-        return $row ? $row['group_id'] : 0;
-    } catch (\Dibi\Exception $e) {
-        writeLog('error', 'Tab Group Function - Error Fetching Tab Group', $tab);
-        return 0;
-    }
+	try {
+		$connect = new Dibi\Connection([
+			'driver' => 'sqlite3',
+			'database' => $GLOBALS['dbLocation'] . $GLOBALS['dbName'],]);
+		$row = $connect->fetch('SELECT group_id FROM tabs WHERE name LIKE %~like~', $tab);
+		return $row ? $row['group_id'] : 0;
+	} catch (\Dibi\Exception $e) {
+		writeLog('error', 'Tab Group Function - Error Fetching Tab Group', $tab);
+		return 0;
+	}
 }
 
 function logoOrText()
 {
-	if ($GLOBALS['useLogo'] == false) {
+	if ($GLOBALS['useLogoLogin'] == false) {
 		return '<h1>' . $GLOBALS['title'] . '</h1>';
 	} else {
 		return '<img class="loginLogo" src="' . $GLOBALS['loginLogo'] . '" alt="Home" />';
@@ -1971,13 +2037,23 @@ function getImage()
 		if (file_exists($cachefile) && time() - $cachetime < filemtime($cachefile) && $refresh == false) {
 			header("Content-type: image/jpeg");
 			//@readfile($cachefile);
-			echo @curl('get', $cachefile)['content'];
+			//echo @curl('get', $cachefile)['content'];
+			$options = array('verify' => false);
+			$response = Requests::get($cachefile, array(), $options);
+			if ($response->success) {
+				echo $response->body;
+			}
 			exit;
 		}
 		ob_start(); // Start the output buffer
 		header('Content-type: image/jpeg');
 		//@readfile($image_src);
-		echo @curl('get', $image_src)['content'];
+		//echo @curl('get', $image_src)['content'];
+		$options = array('verify' => false);
+		$response = Requests::get($image_src, array(), $options);
+		if ($response->success) {
+			echo $response->body;
+		}
 		// Cache the output to a file
 		$fp = fopen($cachefile, 'wb');
 		fwrite($fp, ob_get_contents());
@@ -1989,14 +2065,17 @@ function getImage()
 	}
 }
 
-function cacheImage($url, $name)
+function cacheImage($url, $name, $extension = 'jpg')
 {
 	$cacheDirectory = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'plugins' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'cache' . DIRECTORY_SEPARATOR;
 	if (!file_exists($cacheDirectory)) {
 		mkdir($cacheDirectory, 0777, true);
 	}
-	$cachefile = $cacheDirectory . $name . '.jpg';
-	@copy($url, $cachefile);
+	$cachefile = $cacheDirectory . $name . '.' . $extension;
+	$cachetime = 604800;
+	if ((file_exists($cachefile) && time() - $cachetime < filemtime($cachefile)) || !file_exists($cachefile)) {
+		@copy($url, $cachefile);
+	}
 }
 
 function downloader($array)
@@ -2013,34 +2092,34 @@ function downloader($array)
 					break;
 			}
 			break;
-        case 'jdownloader':
-            switch ($array['data']['action']) {
-                case 'start':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'stop':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'resume':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'pause':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'update':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'retry':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                case 'remove':
-                    jdownloaderAction($array['data']['action'], $array['data']['target']);
-                    break;
-                default:
-                    # code...
-                    break;
-            }
-            break;
+		case 'jdownloader':
+			switch ($array['data']['action']) {
+				case 'start':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'stop':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'resume':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'pause':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'update':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'retry':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				case 'remove':
+					jdownloaderAction($array['data']['action'], $array['data']['target']);
+					break;
+				default:
+					# code...
+					break;
+			}
+			break;
 		case 'nzbget':
 			break;
 		default:
@@ -2051,53 +2130,51 @@ function downloader($array)
 
 function jdownloaderAction($action = null, $target = null)
 {
-    if ($GLOBALS['homepageJdownloaderEnabled'] && !empty($GLOBALS['jdownloaderURL']) && qualifyRequest($GLOBALS['homepageJdownloaderAuth'])) {
-        $url = qualifyURL($GLOBALS['jdownloaderURL']);
-
-        # This ensures compatibility with RSScrawler
-        $url = str_replace('/myjd', '', $url);
-        if(substr($url , -1)=='/') {
-            $url = substr_replace($url ,"",-1);
-        }
-
-        switch ($action) {
-            case 'start':
-                $url = $url . '/myjd_start/';
-                break;
-            case 'stop':
-                $url = $url . '/myjd_stop/';
-                break;
-            case 'resume':
-                $url = $url . '/myjd_pause/false';
-                break;
-            case 'pause':
-                $url = $url . '/myjd_pause/true';
-                break;
-            case 'update':
-                $url = $url . '/myjd_update';
-                break;
-            case 'retry':
-                # code...
-                break;
-            case 'remove':
-                # code...
-                break;
-            default:
-                # code...
-                break;
-        }
-        try {
-            $options = (localURL($url)) ? array('verify' => false) : array();
-            $response = Requests::post($url, array(), $options);
-            if ($response->success) {
-                $api['content'] = json_decode($response->body, true);
-            }
-        } catch (Requests_Exception $e) {
-            writeLog('error', 'JDownloader Connect Function - Error: ' . $e->getMessage(), 'SYSTEM');
-        };
-        $api['content'] = isset($api['content']) ? $api['content'] : false;
-        return $api;
-    }
+	if ($GLOBALS['homepageJdownloaderEnabled'] && !empty($GLOBALS['jdownloaderURL']) && qualifyRequest($GLOBALS['homepageJdownloaderAuth'])) {
+		$url = qualifyURL($GLOBALS['jdownloaderURL']);
+		# This ensures compatibility with RSScrawler
+		$url = str_replace('/myjd', '', $url);
+		if (substr($url, -1) == '/') {
+			$url = substr_replace($url, "", -1);
+		}
+		switch ($action) {
+			case 'start':
+				$url = $url . '/myjd_start/';
+				break;
+			case 'stop':
+				$url = $url . '/myjd_stop/';
+				break;
+			case 'resume':
+				$url = $url . '/myjd_pause/false';
+				break;
+			case 'pause':
+				$url = $url . '/myjd_pause/true';
+				break;
+			case 'update':
+				$url = $url . '/myjd_update';
+				break;
+			case 'retry':
+				# code...
+				break;
+			case 'remove':
+				# code...
+				break;
+			default:
+				# code...
+				break;
+		}
+		try {
+			$options = (localURL($url)) ? array('verify' => false) : array();
+			$response = Requests::post($url, array(), $options);
+			if ($response->success) {
+				$api['content'] = json_decode($response->body, true);
+			}
+		} catch (Requests_Exception $e) {
+			writeLog('error', 'JDownloader Connect Function - Error: ' . $e->getMessage(), 'SYSTEM');
+		};
+		$api['content'] = isset($api['content']) ? $api['content'] : false;
+		return $api;
+	}
 }
 
 function sabnzbdAction($action = null, $target = null)
@@ -2586,21 +2663,23 @@ function checkHostPrefix($s)
 	}
 	return (substr($s, -1, 1) == '\\') ? $s : $s . '\\';
 }
+
 function analyzeIP($ip)
 {
-	if(strpos($ip,'/') !== false){
+	if (strpos($ip, '/') !== false) {
 		$explodeIP = explode('/', $ip);
 		$prefix = $explodeIP[1];
 		$start_ip = $explodeIP[0];
 		$ip_count = 1 << (32 - $prefix);
 		$start_ip_long = ip2long($start_ip);
 		$last_ip_long = ip2long($start_ip) + $ip_count - 1;
-	}elseif(substr_count($ip, '.') == 3){
+	} elseif (substr_count($ip, '.') == 3) {
 		$start_ip_long = ip2long($ip);
 		$last_ip_long = ip2long($ip);
 	}
 	return (isset($start_ip_long) && isset($last_ip_long)) ? array('from' => $start_ip_long, 'to' => $last_ip_long) : false;
 }
+
 function authProxyRangeCheck($from, $to)
 {
 	$approved = false;
